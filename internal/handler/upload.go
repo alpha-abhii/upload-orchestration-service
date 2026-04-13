@@ -117,3 +117,25 @@ func (h *UploadHandler) GetUploadStatus(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }
+
+func (h *UploadHandler) GetDownloadURL(w http.ResponseWriter, r *http.Request) {
+	key := r.URL.Query().Get("key")
+
+	if key == "" {
+		apierror.BadRequest(w, "key is required query parameter")
+		return
+	}
+
+	resp, err := h.svc.GetDownloadURL(r.Context(), service.GetDownloadURLRequest{
+		Key: key,
+	})
+	if err != nil {
+		slog.Error("get download url failed", "error", err)
+		apierror.BadRequest(w, err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}

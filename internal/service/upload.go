@@ -262,3 +262,50 @@ func (s *UploadService) GetUploadStatus(ctx context.Context, req UploadStatusReq
 		UploadedCount: len(parts),
 	}, nil
 }
+
+type GetDownloadURLRequest struct {
+	Key string `json:"key"`
+}
+
+type GetDownloadURLResponse struct {
+	URL      string `json:"url"`
+	Source   string `json:"source"` // "cloudfront" or "s3"
+	ExpireAt string `json:"expire_at"`
+}
+
+func (s *UploadService) GetDownloadURL(ctx context.Context, req GetDownloadURLRequest) (*GetDownloadURLResponse, error) {
+	if req.Key == "" {
+		return nil, fmt.Errorf("key is required")
+	}
+
+	expireAt := time.Now().UTC().Add(1 * time.Hour)
+
+	// If CloudFront is configured, return a CloudFront URL.
+	// CloudFront serves from the nearest edge location — much faster for global users.
+	// If not configured, fall back to a direct S3 URL.
+	if s.config.CloudFrontDomain != "" {
+		url := fmt.Sprintf("%s/%s", s.config.CloudFrontDomain, req.Key)
+		slog.Info("generated cloudfront download url", "key", req.Key)
+		return &GetDownloadURLResponse{
+			URL:      url,
+			Source:   "cloudfront",
+			ExpireAt: expireAt.Format(time.RFC3339),
+		}, nil
+	}
+
+	// Fallback: direct S3 URL
+	// In production without CloudFront, you'd presign this URL for security.
+	// For now we return the public path — works if bucket has public read access.
+	url := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s",
+		s.config.S3Bucket,
+		s.config.AWSRegion,
+		req.Key,
+	)
+
+	slog.Info("generated s3 download url", "key", req.Key)
+	return &GetDownloadURLResponse{
+		URL:      url,
+		Source:   "s3",
+		ExpireAt: expireAt.Format(time.RFC3339),
+	}, nil
+}

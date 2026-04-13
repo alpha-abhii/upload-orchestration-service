@@ -43,6 +43,7 @@ func main() {
 	uploadService := service.NewUploadService(s3Store, cfg)
 	uploadHandler := handler.NewUploadHandler(uploadService)
 	healthHandler := handler.NewHealthHandler(s3Store.S3Client(), cfg.S3Bucket)
+	webhookHandler := handler.NewWebhookHandler()
 
 	rateLimiter := middleware.NewRateLimiter(100, time.Minute)
 
@@ -57,16 +58,13 @@ func main() {
 	r.Get("/health", healthHandler.Health)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		// Initiate and complete make S3 calls — give them 10 seconds
 		r.With(middleware.RouteTimeout(10*time.Second)).Post("/upload/initiate", uploadHandler.Initiate)
 		r.With(middleware.RouteTimeout(10*time.Second)).Post("/upload/complete", uploadHandler.Complete)
-
-		// Presigning is local — 5 seconds is plenty
 		r.With(middleware.RouteTimeout(5*time.Second)).Post("/upload/presigned-urls", uploadHandler.GetPresignedURLs)
-
-		// Abort and status also hit S3
 		r.With(middleware.RouteTimeout(10*time.Second)).Delete("/upload/abort", uploadHandler.Abort)
 		r.With(middleware.RouteTimeout(10*time.Second)).Get("/upload/status", uploadHandler.GetUploadStatus)
+		r.With(middleware.RouteTimeout(5*time.Second)).Get("/upload/download-url", uploadHandler.GetDownloadURL)
+		r.Post("/webhook/s3", webhookHandler.HandleS3Event)
 	})
 
 	srv := &http.Server{

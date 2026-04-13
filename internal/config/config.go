@@ -6,20 +6,22 @@ import (
 )
 
 type Config struct {
-	Port         string
-	AWSRegion    string
-	AWSAccessKey string
-	AWSSecretKey string
-	S3Bucket     string
+	Port             string
+	AWSRegion        string
+	AWSAccessKey     string
+	AWSSecretKey     string
+	S3Bucket         string
+	CloudFrontDomain string
 }
 
 func Load() (*Config, error) {
 	cfg := &Config{
-		Port:         getEnvOrDefault("PORT", "8080"),
-		AWSRegion:    getEnvOrDefault("AWS_REGION", "us-east-1"),
-		AWSAccessKey: os.Getenv("AWS_ACCESS_KEY_ID"),
-		AWSSecretKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
-		S3Bucket:     os.Getenv("S3_BUCKET"),
+		Port:             getEnvOrDefault("PORT", "8080"),
+		AWSRegion:        getEnvOrDefault("AWS_REGION", "us-east-1"),
+		AWSAccessKey:     os.Getenv("AWS_ACCESS_KEY_ID"),
+		AWSSecretKey:     os.Getenv("AWS_SECRET_ACCESS_KEY"),
+		S3Bucket:         os.Getenv("S3_BUCKET"),
+		CloudFrontDomain: os.Getenv("CLOUDFRONT_DOMAIN"),
 	}
 
 	if err := cfg.validate(); err != nil {
