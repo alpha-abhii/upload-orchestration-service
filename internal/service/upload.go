@@ -38,6 +38,11 @@ func (s *UploadService) Initiate(ctx context.Context, req InitiateUploadRequest)
 		return nil, fmt.Errorf("file_size_bytes must be greater than 0")
 	}
 
+	maxFileSize := int64(5 * 1024 * 1024 * 1024) // 5GB
+	if req.FileSizeBytes > maxFileSize {
+		return nil, fmt.Errorf("file_size_bytes exceeds maximum allowed size of 5GB")
+	}
+
 	if err := s.validateContentType(req.ContentType); err != nil {
 		return nil, err
 	}
@@ -124,6 +129,12 @@ func (s *UploadService) GetPresignedURLs(ctx context.Context, req PresignedURLRe
 	}
 	if len(req.PartNumbers) == 0 {
 		return nil, fmt.Errorf("part_numbers must not be empty")
+	}
+
+	for _, partNum := range req.PartNumbers {
+		if partNum < 1 || partNum > 10000 {
+			return nil, fmt.Errorf("part_number %d is invalid, must be between 1 and 10000", partNum)
+		}
 	}
 
 	ttl := time.Duration(15) * time.Minute

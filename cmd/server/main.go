@@ -44,10 +44,14 @@ func main() {
 	uploadService := service.NewUploadService(s3Store, cfg)
 	uploadHandler := handler.NewUploadHandler(uploadService)
 
+	rateLimiter := middleware.NewRateLimiter(100, time.Minute)
+
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Recoverer)
 	r.Use(chimiddleware.RequestID)
 	r.Use(middleware.RequestLogger)
+	r.Use(middleware.MaxBodySize(1 * 1024 * 1024)) // 1MB max JSON body
+	r.Use(rateLimiter.Limit)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
