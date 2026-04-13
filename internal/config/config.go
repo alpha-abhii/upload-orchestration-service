@@ -33,8 +33,6 @@ func Load() (*Config, error) {
 
 func (c *Config) validate() error {
 	required := map[string]string{
-		"AWS_ACCESS_KEY_ID":     c.AWSAccessKey,
-		"AWS_SECRET_ACCESS_KEY": c.AWSSecretKey,
 		"S3_BUCKET":             c.S3Bucket,
 	}
 

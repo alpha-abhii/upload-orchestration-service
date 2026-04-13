@@ -39,17 +39,27 @@ type S3Store struct {
 }
 
 func NewS3Store(cfg *config.Config) (*S3Store, error) {
-	awsCfg, err := awsconfig.LoadDefaultConfig(
-		context.Background(),
+	awsOpts := []func(*awsconfig.LoadOptions) error{
 		awsconfig.WithRegion(cfg.AWSRegion),
-		awsconfig.WithCredentialsProvider(
+	}
+
+	// Only use static credentials if explicitly provided.
+	// In production (ECS), credentials come from the IAM task role automatically.
+	if cfg.AWSAccessKey != "" && cfg.AWSSecretKey != "" {
+		awsOpts = append(awsOpts, awsconfig.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(
 				cfg.AWSAccessKey,
 				cfg.AWSSecretKey,
 				"",
 			),
-		),
+		))
+	}
+
+	awsCfg, err := awsconfig.LoadDefaultConfig(
+		context.Background(),
+		awsOpts...,
 	)
+	
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
