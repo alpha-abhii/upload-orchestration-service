@@ -49,6 +49,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Recoverer)
 	r.Use(chimiddleware.RequestID)
+	r.Use(middleware.InjectRequestID)
 	r.Use(middleware.RequestLogger)
 	r.Use(middleware.MaxBodySize(1 * 1024 * 1024)) // 1MB max JSON body
 	r.Use(rateLimiter.Limit)

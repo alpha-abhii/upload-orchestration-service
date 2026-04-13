@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math"
 	"strings"
 	"time"
@@ -56,10 +57,28 @@ func (s *UploadService) Initiate(ctx context.Context, req InitiateUploadRequest)
 
 	key := fmt.Sprintf("uploads/%s_%d", sanitizeFilename(req.Filename), time.Now().UnixNano())
 
+	slog.Info("initiating multipart upload",
+		"key", key,
+		"total_parts", totalParts,
+		"chunk_size", chunkSize,
+		"file_size", req.FileSizeBytes,
+	)
+
+	start := time.Now()
 	uploadID, err := s.store.InitiateMultipartUpload(ctx, key, req.ContentType)
 	if err != nil {
+		slog.Error("failed to initiate multipart upload",
+			"key", key,
+			"error", err,
+		)
 		return nil, fmt.Errorf("failed to initiate upload: %w", err)
 	}
+
+	slog.Info("multipart upload initiated",
+		"upload_id", uploadID,
+		"key", key,
+		"s3_duration_ms", time.Since(start).Milliseconds(),
+	)
 
 	return &InitiateUploadResponse{
 		UploadID:   uploadID,
@@ -168,9 +187,27 @@ func (s *UploadService) Complete(ctx context.Context, req CompleteUploadRequest)
 		}
 	}
 
+	slog.Info("completing multipart upload",
+		"upload_id", req.UploadID,
+		"key", req.Key,
+		"parts_count", len(req.Parts),
+	)
+
+	start := time.Now()
 	if err := s.store.CompleteMultipartUpload(ctx, req.Key, req.UploadID, req.Parts); err != nil {
+		slog.Error("failed to complete multipart upload",
+			"upload_id", req.UploadID,
+			"key", req.Key,
+			"error", err,
+		)
 		return nil, fmt.Errorf("failed to complete upload: %w", err)
 	}
+
+	slog.Info("multipart upload completed",
+		"upload_id", req.UploadID,
+		"key", req.Key,
+		"s3_duration_ms", time.Since(start).Milliseconds(),
+	)
 
 	return &CompleteUploadResponse{
 		Key:     req.Key,
