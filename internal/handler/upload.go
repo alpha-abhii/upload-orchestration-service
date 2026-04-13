@@ -93,3 +93,27 @@ func (h *UploadHandler) Abort(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *UploadHandler) GetUploadStatus(w http.ResponseWriter, r *http.Request) {
+	uploadID := r.URL.Query().Get("upload_id")
+	key := r.URL.Query().Get("key")
+
+	if uploadID == "" || key == "" {
+		apierror.BadRequest(w, "upload_id and key are required query parameters")
+		return
+	}
+
+	resp, err := h.svc.GetUploadStatus(r.Context(), service.UploadStatusRequest{
+		UploadID: uploadID,
+		Key:      key,
+	})
+	if err != nil {
+		slog.Error("get upload status failed", "error", err)
+		apierror.BadRequest(w, err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}

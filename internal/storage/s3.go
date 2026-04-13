@@ -18,11 +18,18 @@ type Store interface {
 	GeneratePresignedURL(ctx context.Context, key string, uploadID string, partNumber int32, ttl time.Duration) (string, error)
 	CompleteMultipartUpload(ctx context.Context, key string, uploadID string, parts []CompletedPart) error
 	AbortMultipartUpload(ctx context.Context, key string, uploadID string) error
+	ListUploadedParts(ctx context.Context, key string, uploadID string) ([]UploadedPart, error)
 }
 
 type CompletedPart struct {
 	PartNumber int32  `json:"part_number"`
 	ETag       string `json:"etag"`
+}
+
+type UploadedPart struct {
+	PartNumber int32  `json:"part_number"`
+	ETag       string `json:"etag"`
+	Size       int64  `json:"size"`
 }
 
 type S3Store struct {
@@ -129,4 +136,39 @@ func (s *S3Store) AbortMultipartUpload(ctx context.Context, key string, uploadID
 	}
 
 	return nil
+}
+
+func (s *S3Store) ListUploadedParts(ctx context.Context, key string, uploadID string) ([]UploadedPart, error) {
+	var parts []UploadedPart
+	var partNumberMarker *string
+
+	for {
+		input := &s3.ListPartsInput{
+			Bucket:           aws.String(s.bucket),
+			Key:              aws.String(key),
+			UploadId:         aws.String(uploadID),
+			PartNumberMarker: partNumberMarker,
+		}
+
+		result, err := s.client.ListParts(ctx, input)
+		if err != nil {
+			return nil, fmt.Errorf("ListParts failed: %w", err)
+		}
+
+		for _, p := range result.Parts {
+			parts = append(parts, UploadedPart{
+				PartNumber: aws.ToInt32(p.PartNumber),
+				ETag:       aws.ToString(p.ETag),
+				Size:       aws.ToInt64(p.Size),
+			})
+		}
+
+		if !aws.ToBool(result.IsTruncated) {
+			break
+		}
+
+		partNumberMarker = result.NextPartNumberMarker
+	}
+
+	return parts, nil
 }

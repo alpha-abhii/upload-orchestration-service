@@ -229,3 +229,36 @@ func (s *UploadService) Abort(ctx context.Context, req AbortUploadRequest) error
 
 	return nil
 }
+
+type UploadStatusRequest struct {
+	UploadID string `json:"upload_id"`
+	Key      string `json:"key"`
+}
+
+type UploadStatusResponse struct {
+	UploadID      string                  `json:"upload_id"`
+	Key           string                  `json:"key"`
+	UploadedParts []storage.UploadedPart  `json:"uploaded_parts"`
+	UploadedCount int                     `json:"uploaded_count"`
+}
+
+func (s *UploadService) GetUploadStatus(ctx context.Context, req UploadStatusRequest) (*UploadStatusResponse, error) {
+	if req.UploadID == "" {
+		return nil, fmt.Errorf("upload_id is required")
+	}
+	if req.Key == "" {
+		return nil, fmt.Errorf("key is required")
+	}
+
+	parts, err := s.store.ListUploadedParts(ctx, req.Key, req.UploadID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list uploaded parts: %w", err)
+	}
+
+	return &UploadStatusResponse{
+		UploadID:      req.UploadID,
+		Key:           req.Key,
+		UploadedParts: parts,
+		UploadedCount: len(parts),
+	}, nil
+}

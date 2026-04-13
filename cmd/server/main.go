@@ -64,6 +64,7 @@ func main() {
 		r.Post("/upload/presigned-urls", uploadHandler.GetPresignedURLs)
 		r.Post("/upload/complete", uploadHandler.Complete)
 		r.Delete("/upload/abort", uploadHandler.Abort)
+		r.Get("/upload/status", uploadHandler.GetUploadStatus)
 	})
 
 	srv := &http.Server{
