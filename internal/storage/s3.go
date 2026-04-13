@@ -21,8 +21,8 @@ type Store interface {
 }
 
 type CompletedPart struct {
-	PartNumber int32
-	ETag       string
+	PartNumber int32  `json:"part_number"`
+	ETag       string `json:"etag"`
 }
 
 type S3Store struct {

@@ -56,6 +56,9 @@ func main() {
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/upload/initiate", uploadHandler.Initiate)
+		r.Post("/upload/presigned-urls", uploadHandler.GetPresignedURLs)
+		r.Post("/upload/complete", uploadHandler.Complete)
+		r.Delete("/upload/abort", uploadHandler.Abort)
 	})
 
 	srv := &http.Server{
