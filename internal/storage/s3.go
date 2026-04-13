@@ -63,6 +63,14 @@ func NewS3Store(cfg *config.Config) (*S3Store, error) {
 	}, nil
 }
 
+func (s *S3Store) S3Client() *s3.Client {
+	return s.client
+}
+
+func (s *S3Store) Bucket() string {
+	return s.bucket
+}
+
 func (s *S3Store) InitiateMultipartUpload(ctx context.Context, key string, contentType string) (string, error) {
 	input := &s3.CreateMultipartUploadInput{
 		Bucket:      aws.String(s.bucket),

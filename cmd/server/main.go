@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -43,6 +42,7 @@ func main() {
 
 	uploadService := service.NewUploadService(s3Store, cfg)
 	uploadHandler := handler.NewUploadHandler(uploadService)
+	healthHandler := handler.NewHealthHandler(s3Store.S3Client(), cfg.S3Bucket)
 
 	rateLimiter := middleware.NewRateLimiter(100, time.Minute)
 
@@ -54,17 +54,19 @@ func main() {
 	r.Use(middleware.MaxBodySize(1 * 1024 * 1024)) // 1MB max JSON body
 	r.Use(rateLimiter.Limit)
 
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"status":"ok"}`)
-	})
+	r.Get("/health", healthHandler.Health)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Post("/upload/initiate", uploadHandler.Initiate)
-		r.Post("/upload/presigned-urls", uploadHandler.GetPresignedURLs)
-		r.Post("/upload/complete", uploadHandler.Complete)
-		r.Delete("/upload/abort", uploadHandler.Abort)
-		r.Get("/upload/status", uploadHandler.GetUploadStatus)
+		// Initiate and complete make S3 calls — give them 10 seconds
+		r.With(middleware.RouteTimeout(10*time.Second)).Post("/upload/initiate", uploadHandler.Initiate)
+		r.With(middleware.RouteTimeout(10*time.Second)).Post("/upload/complete", uploadHandler.Complete)
+
+		// Presigning is local — 5 seconds is plenty
+		r.With(middleware.RouteTimeout(5*time.Second)).Post("/upload/presigned-urls", uploadHandler.GetPresignedURLs)
+
+		// Abort and status also hit S3
+		r.With(middleware.RouteTimeout(10*time.Second)).Delete("/upload/abort", uploadHandler.Abort)
+		r.With(middleware.RouteTimeout(10*time.Second)).Get("/upload/status", uploadHandler.GetUploadStatus)
 	})
 
 	srv := &http.Server{
