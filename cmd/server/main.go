@@ -12,17 +12,22 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 
 	"github.com/alpha-abhii/upload-orchestration-service/internal/config"
 	"github.com/alpha-abhii/upload-orchestration-service/internal/handler"
 	"github.com/alpha-abhii/upload-orchestration-service/internal/middleware"
 	"github.com/alpha-abhii/upload-orchestration-service/internal/service"
 	"github.com/alpha-abhii/upload-orchestration-service/internal/storage"
+	"github.com/alpha-abhii/upload-orchestration-service/internal/worker"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	if err := godotenv.Load(); err != nil {
 		slog.Info("no .env file found, reading from system environment")
@@ -34,10 +39,25 @@ func main() {
 		os.Exit(1)
 	}
 
+	awsCfg, err := storage.NewAWSConfig(cfg)
+	if err != nil {
+		slog.Error("failed to load AWS config", "error", err)
+		os.Exit(1)
+	}
+
 	s3Store, err := storage.NewS3Store(cfg)
 	if err != nil {
 		slog.Error("failed to initialize S3 store", "error", err)
 		os.Exit(1)
+	}
+	slog.Info("S3 store initialized")
+
+	sqsQueueURL := os.Getenv("SQS_QUEUE_URL")
+	if sqsQueueURL != "" {
+		sqsClient := sqs.NewFromConfig(awsCfg)
+		poller := worker.NewSQSPoller(sqsClient, sqsQueueURL)
+		go poller.Start(ctx)
+		slog.Info("SQS poller started", "queue", sqsQueueURL)
 	}
 
 	uploadService := service.NewUploadService(s3Store, cfg)
@@ -92,10 +112,10 @@ func main() {
 		slog.Info("shutdown signal received", "signal", sig)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
 
-	if err := srv.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("graceful shutdown failed", "error", err)
 		os.Exit(1)
 	}

@@ -12,6 +12,7 @@ env:
   ECS_SERVICE: upload-orchestration-service
   TASK_DEFINITION_FAMILY: upload-orchestration-service
   CONTAINER_NAME: upload-orchestration-service
+  ALB_DNS: upload-orchestration-alb-893828526.ap-south-1.elb.amazonaws.com
 
 jobs:
   test:
@@ -80,3 +81,4 @@ jobs:
           service: ${{ env.ECS_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
+          codedeploy-appspec: false
