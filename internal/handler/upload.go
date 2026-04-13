@@ -36,3 +36,60 @@ func (h *UploadHandler) Initiate(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }
+
+func (h *UploadHandler) GetPresignedURLs(w http.ResponseWriter, r *http.Request) {
+	var req service.PresignedURLRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		apierror.BadRequest(w, "invalid request body")
+		return
+	}
+
+	resp, err := h.svc.GetPresignedURLs(r.Context(), req)
+	if err != nil {
+		slog.Error("get presigned urls failed", "error", err)
+		apierror.BadRequest(w, err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (h *UploadHandler) Complete(w http.ResponseWriter, r *http.Request) {
+	var req service.CompleteUploadRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		apierror.BadRequest(w, "invalid request body")
+		return
+	}
+
+	resp, err := h.svc.Complete(r.Context(), req)
+	if err != nil {
+		slog.Error("complete upload failed", "error", err)
+		apierror.BadRequest(w, err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (h *UploadHandler) Abort(w http.ResponseWriter, r *http.Request) {
+	var req service.AbortUploadRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		apierror.BadRequest(w, "invalid request body")
+		return
+	}
+
+	if err := h.svc.Abort(r.Context(), req); err != nil {
+		slog.Error("abort upload failed", "error", err)
+		apierror.BadRequest(w, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}

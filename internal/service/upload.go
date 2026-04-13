@@ -88,3 +88,96 @@ func sanitizeFilename(filename string) string {
 	replacer := strings.NewReplacer(" ", "_", "/", "_", "\\", "_")
 	return replacer.Replace(filename)
 }
+
+type PresignedURLRequest struct {
+	UploadID    string  `json:"upload_id"`
+	Key         string  `json:"key"`
+	PartNumbers []int32 `json:"part_numbers"`
+}
+
+type PresignedURLResponse struct {
+	URLs map[string]string `json:"urls"`
+}
+
+type CompleteUploadRequest struct {
+	UploadID string                  `json:"upload_id"`
+	Key      string                  `json:"key"`
+	Parts    []storage.CompletedPart `json:"parts"`
+}
+
+type CompleteUploadResponse struct {
+	Key     string `json:"key"`
+	Message string `json:"message"`
+}
+
+type AbortUploadRequest struct {
+	UploadID string `json:"upload_id"`
+	Key      string `json:"key"`
+}
+
+func (s *UploadService) GetPresignedURLs(ctx context.Context, req PresignedURLRequest) (*PresignedURLResponse, error) {
+	if req.UploadID == "" {
+		return nil, fmt.Errorf("upload_id is required")
+	}
+	if req.Key == "" {
+		return nil, fmt.Errorf("key is required")
+	}
+	if len(req.PartNumbers) == 0 {
+		return nil, fmt.Errorf("part_numbers must not be empty")
+	}
+
+	ttl := time.Duration(15) * time.Minute
+	urls := make(map[string]string, len(req.PartNumbers))
+
+	for _, partNum := range req.PartNumbers {
+		url, err := s.store.GeneratePresignedURL(ctx, req.Key, req.UploadID, partNum, ttl)
+		if err != nil {
+			return nil, fmt.Errorf("failed to presign part %d: %w", partNum, err)
+		}
+		urls[fmt.Sprintf("%d", partNum)] = url
+	}
+
+	return &PresignedURLResponse{URLs: urls}, nil
+}
+
+func (s *UploadService) Complete(ctx context.Context, req CompleteUploadRequest) (*CompleteUploadResponse, error) {
+	if req.UploadID == "" {
+		return nil, fmt.Errorf("upload_id is required")
+	}
+	if req.Key == "" {
+		return nil, fmt.Errorf("key is required")
+	}
+	if len(req.Parts) == 0 {
+		return nil, fmt.Errorf("parts must not be empty")
+	}
+
+	for i, part := range req.Parts {
+		if part.ETag == "" {
+			return nil, fmt.Errorf("part at index %d is missing etag", i)
+		}
+	}
+
+	if err := s.store.CompleteMultipartUpload(ctx, req.Key, req.UploadID, req.Parts); err != nil {
+		return nil, fmt.Errorf("failed to complete upload: %w", err)
+	}
+
+	return &CompleteUploadResponse{
+		Key:     req.Key,
+		Message: "upload completed successfully",
+	}, nil
+}
+
+func (s *UploadService) Abort(ctx context.Context, req AbortUploadRequest) error {
+	if req.UploadID == "" {
+		return fmt.Errorf("upload_id is required")
+	}
+	if req.Key == "" {
+		return fmt.Errorf("key is required")
+	}
+
+	if err := s.store.AbortMultipartUpload(ctx, req.Key, req.UploadID); err != nil {
+		return fmt.Errorf("failed to abort upload: %w", err)
+	}
+
+	return nil
+}
