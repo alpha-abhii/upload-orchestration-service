@@ -11,7 +11,7 @@ import (
 )
 
 type S3Pinger interface {
-	HeadBucket(ctx context.Context, params *s3.HeadBucketInput, optFns ...func(*s3.Options)) (*s3.HeadBucketOutput, error)
+	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
 }
 
 type HealthHandler struct {
@@ -34,11 +34,12 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 	overallStatus := "ok"
 
 	// Check S3 connectivity with a 3 second timeout
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	_, err := h.s3Client.HeadBucket(ctx, &s3.HeadBucketInput{
-		Bucket: aws.String(h.bucket),
+	_, err := h.s3Client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+		Bucket:  aws.String(h.bucket),
+		MaxKeys: aws.Int32(1),
 	})
 	if err != nil {
 		components["s3"] = "unhealthy: " + err.Error()

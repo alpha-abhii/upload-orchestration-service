@@ -54,7 +54,9 @@ func NewS3Store(cfg *config.Config) (*S3Store, error) {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
-	client := s3.NewFromConfig(awsCfg)
+	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		o.UsePathStyle = false
+	})
 
 	return &S3Store{
 		client:    client,
